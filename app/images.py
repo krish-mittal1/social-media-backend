@@ -2,8 +2,10 @@ from dotenv import load_dotenv
 from imagekitio import ImageKit
 import os
 import logging
+import pathlib
 
-load_dotenv()
+BASE_DIR = pathlib.Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 logger = logging.getLogger(__name__)
 

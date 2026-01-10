@@ -9,17 +9,22 @@ from fastapi_users.authentication import (
     BearerTransport,
     JWTStrategy
 )
+from dotenv import load_dotenv
 from fastapi_users.db import SQLAlchemyUserDatabase
 from app.db import User , get_user_db
+import pathlib
 
 logger = logging.getLogger(__name__)
 
+BASE_DIR = pathlib.Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
+
 # FIX: Move hardcoded secret to environment variable for security
 # In production, this must be set via environment variable
-SECRET = os.getenv("SECRET_KEY", "3c2WG9udC6q9p5I5CUtXlayDXTbFyCQDIJqTFCHZUpA")
-if not SECRET or SECRET == "3c2WG9udC6q9p5I5CUtXlayDXTbFyCQDIJqTFCHZUpA":
-    import warnings
-    warnings.warn("Using default SECRET_KEY. Set SECRET_KEY environment variable in production!", UserWarning)
+SECRET = os.getenv("SECRET_KEY")
+
+if not SECRET:
+    raise RuntimeError("SECRET_KEY is missing. Set it as environment variable.")
 
 class UserManager(UUIDIDMixin , BaseUserManager[User , uuid.UUID]):
     reset_password_token_secret = SECRET
