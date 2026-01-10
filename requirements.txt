@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+asyncpg
+aiosqlite
+fastapi-users[sqlalchemy]
+python-dotenv
+imagekitio
+httpx
+pydantic
+pydantic-settings
