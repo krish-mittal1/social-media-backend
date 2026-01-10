@@ -5,7 +5,7 @@ asyncpg
 aiosqlite
 fastapi-users[sqlalchemy]
 python-dotenv
-imagekitio
+imagekitio==4.0.1
 httpx
 pydantic
 pydantic-settings

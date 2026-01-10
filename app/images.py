@@ -22,8 +22,9 @@ if not all([private_key, public_key, url_endpoint]):
         "File uploads will fail until configured."
     )
 
+
 imagekit = ImageKit(
-    private_key=private_key or "",
-    public_key=public_key or "",
-    url_endpoint=url_endpoint or "",
+    private_key=os.getenv("IMAGEKIT_PRIVATE_KEY"),
+    public_key=os.getenv("IMAGEKIT_PUBLIC_KEY"),
+    url_endpoint=os.getenv("IMAGEKIT_URL_ENDPOINT"),
 )
