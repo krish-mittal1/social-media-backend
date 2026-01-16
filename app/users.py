@@ -19,8 +19,7 @@ logger = logging.getLogger(__name__)
 BASE_DIR = pathlib.Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-# FIX: Move hardcoded secret to environment variable for security
-# In production, this must be set via environment variable
+
 SECRET = os.getenv("SECRET_KEY")
 
 if not SECRET:
@@ -31,23 +30,17 @@ class UserManager(UUIDIDMixin , BaseUserManager[User , uuid.UUID]):
     verification_token_secret = SECRET
 
     async def on_after_register(self, user:User , request:Optional[Request] = None):
-        # FIX: Use logging instead of print for production-ready logging
         logger.info(f"User {user.id} ({user.email}) has registered.")
 
     async def on_after_forget_password(self , user:User , token:str , request:Optional[Request] = None):
-        # FIX: Log password reset requests (token should be sent via email in production)
         logger.info(f"Password reset requested for user {user.id} ({user.email})")
 
     async def on_after_request_verify(self , user:User , token:str , request: Optional[Request] = None):
-        # FIX: Log verification requests (token should be sent via email in production)
         logger.info(f"Email verification requested for user {user.id} ({user.email})")
 
 async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):
     yield UserManager(user_db)
 
-# FIX: tokenUrl should match the actual route path for OpenAPI documentation
-# The route is registered with prefix="/api/auth/jwt" in main.py
-# So the full path is "/api/auth/jwt/login"
 bearer_transport = BearerTransport(tokenUrl="/api/auth/jwt/login")
 
 def get_jwt_strategy():

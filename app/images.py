@@ -9,8 +9,7 @@ load_dotenv(BASE_DIR / ".env")
 
 logger = logging.getLogger(__name__)
 
-# FIX: Add validation for required ImageKit environment variables
-# This prevents silent failures and provides clear error messages
+
 private_key = os.getenv("IMAGEKIT_PRIVATE_KEY")
 public_key = os.getenv("IMAGEKIT_PUBLIC_KEY")
 url_endpoint = os.getenv("IMAGEKIT_URL_ENDPOINT")

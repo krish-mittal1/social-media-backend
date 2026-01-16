@@ -1,10 +1,4 @@
-"""
-Production-ready FastAPI application for social media backend.
 
-This module implements a RESTful API for managing posts, file uploads,
-and user authentication with comprehensive error handling, logging,
-validation, and security best practices.
-"""
 
 import asyncio
 import logging
@@ -58,25 +52,24 @@ from app.users import auth_backend, current_active_user, fastapi_users
 from app.images import imagekit
 from imagekitio.models.UploadFileRequestOptions import UploadFileRequestOptions
 
-# FIX: Configure logging with rotation to prevent unbounded file growth
-# RotatingFileHandler automatically rotates logs when they reach maxBytes
-# This prevents disk space exhaustion in production
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.handlers.RotatingFileHandler(
             "app.log",
-            maxBytes=10 * 1024 * 1024,  # 10MB per file
-            backupCount=5,  # Keep 5 backup files (50MB total max)
+            maxBytes=10 * 1024 * 1024,  
+            backupCount=5,  
         ),
         logging.StreamHandler(),
     ],
 )
 logger = logging.getLogger(__name__)
 
-# Configuration constants
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+
+MAX_FILE_SIZE = 50 * 1024 * 1024  
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime"}
 ALLOWED_FILE_TYPES = ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES
@@ -95,8 +88,7 @@ async def lifespan(app: FastAPI):
     """
     logger.info("Starting application...")
     
-    # FIX: Run DB table creation in background to avoid blocking startup
-    # If it fails, app still starts (allows /health endpoint to diagnose issues)
+    
     async def init_db():
         try:
             await create_db_and_tables()
@@ -104,7 +96,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Failed to create database tables: {e}. App will continue but DB operations may fail.")
     
-    # Start DB initialization but don't wait for it - app starts immediately
+    
     asyncio.create_task(init_db())
     
     yield
@@ -112,7 +104,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down application...")
 
 
-# Initialize FastAPI application
+
 app = FastAPI(
     title="Social Media Backend API",
     description="Production-ready REST API for social media platform with authentication, file uploads, and feed management",
@@ -123,7 +115,6 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000").split(","),
@@ -133,7 +124,7 @@ app.add_middleware(
 )
 
 
-# Exception handlers
+
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
     """Handle ValueError exceptions"""
@@ -176,7 +167,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Include authentication routers
+
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
     prefix="/api/auth/jwt",
@@ -204,7 +195,7 @@ app.include_router(
 )
 
 
-# Health check endpoint
+
 @app.get(
     "/health",
     response_model=HealthResponse,
@@ -220,8 +211,7 @@ async def health_check(session: AsyncSession = Depends(get_async_session)):
     FIX: Non-blocking health check with timeout - responds immediately even if DB is slow
     """
     try:
-        # FIX: Add timeout to prevent health check from hanging if DB is slow/unresponsive
-        # This ensures /health endpoint always responds quickly
+        
         await asyncio.wait_for(session.execute(select(1)), timeout=2.0)
         db_status = "connected"
     except asyncio.TimeoutError:
@@ -231,8 +221,7 @@ async def health_check(session: AsyncSession = Depends(get_async_session)):
         logger.error(f"Database health check failed: {e}")
         db_status = "disconnected"
     
-    # FIX: Use timezone-aware datetime (datetime.utcnow is deprecated)
-    # This ensures consistent timestamp handling across different environments
+    
     return HealthResponse(
         status="healthy" if db_status == "connected" else "unhealthy",
         version=APP_VERSION,
@@ -241,7 +230,7 @@ async def health_check(session: AsyncSession = Depends(get_async_session)):
     )
 
 
-# Helper functions
+
 def validate_file_size(file: UploadFile) -> None:
     """Validate file size before processing"""
     if hasattr(file, "size") and file.size and file.size > MAX_FILE_SIZE:
@@ -253,8 +242,7 @@ def validate_file_size(file: UploadFile) -> None:
 
 def validate_file_type(content_type: str | None) -> None:
     """Validate file MIME type"""
-    # FIX: Handle None content_type to prevent runtime errors
-    # Some clients may not send Content-Type header
+    
     if not content_type:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -269,7 +257,7 @@ def validate_file_type(content_type: str | None) -> None:
 
 def get_file_type(content_type: str | None) -> str:
     """Determine file type category (image or video)"""
-    # FIX: Handle None content_type to prevent AttributeError
+    
     if not content_type:
         return "unknown"
     if content_type.startswith("image/"):
@@ -279,7 +267,7 @@ def get_file_type(content_type: str | None) -> str:
     return "unknown"
 
 
-# API Endpoints
+
 @app.post(
     "/api/upload",
     response_model=UploadResponse,
@@ -313,71 +301,64 @@ async def upload_file(
     temp_file_handle = None
     
     try:
-        # Validate file type before processing
+        
         validate_file_type(file.content_type)
         
-        # FIX: Stream file to disk instead of loading entire file into memory
-        # This prevents memory exhaustion with large files and is production-ready
-        # FIX: Use NamedTemporaryFile instead of mktemp() to avoid race conditions
-        # mktemp() creates a security vulnerability due to time-of-check-time-of-use (TOCTOU) race condition
-        # NamedTemporaryFile creates and opens the file atomically, eliminating the race condition
+      
         file_extension = Path(file.filename).suffix if file.filename else ""
         temp_file_handle = tempfile.NamedTemporaryFile(
             mode="wb",
-            delete=False,  # Don't auto-delete, we'll clean up manually in finally block
+            delete=False,  
             suffix=file_extension,
             prefix="upload_",
         )
         temp_file_path = temp_file_handle.name
         
         file_size = 0
-        chunk_size = 8192  # 8KB chunks for efficient streaming
+        chunk_size = 8192  
+
         
-        # Reset file pointer (FastAPI may have read it already for validation)
-        # FIX: Handle case where seek might not be supported (shouldn't happen with FastAPI UploadFile)
         try:
             await file.seek(0)
         except (AttributeError, OSError) as e:
             logger.warning(f"Could not seek file: {e}. File may have been consumed.")
-            # If seek fails, we can't re-read, but validation should have already read it
-            # This is a rare edge case, but we handle it gracefully
+            
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="File could not be processed. Please try uploading again.",
             )
         
-        # FIX: Stream file in chunks - file.read() is async, but file.write() blocks
-        # Run file write operations in thread pool to avoid blocking event loop
+        
         def write_chunk(chunk_data):
             """Helper function to write chunk synchronously in thread pool"""
             temp_file_handle.write(chunk_data)
         
-        # Stream file in chunks to temp file while tracking size
+        
         while True:
             chunk = await file.read(chunk_size)
             if not chunk:
                 break
             file_size += len(chunk)
             
-            # Check size during streaming to fail fast
+           
             if file_size > MAX_FILE_SIZE:
                 temp_file_handle.close()
-                temp_file_handle = None  # Mark as closed to avoid double-close in finally
+                temp_file_handle = None  
                 os.unlink(temp_file_path)
-                temp_file_path = None  # Mark as cleaned up to avoid double-unlink in finally
+                temp_file_path = None  
                 raise HTTPException(
                     status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                     detail=f"File size exceeds maximum allowed size of {MAX_FILE_SIZE / (1024*1024):.0f}MB",
                 )
             
-            # FIX: Run blocking file write in thread pool to avoid blocking event loop
+            #
             await run_in_threadpool(write_chunk, chunk)
         
         temp_file_handle.close()
         temp_file_handle = None
         
         if file_size == 0:
-            # Clean up empty temp file before raising exception
+            
             os.unlink(temp_file_path)
             temp_file_path = None
             raise HTTPException(
@@ -385,11 +366,10 @@ async def upload_file(
                 detail="File is empty",
             )
         
-        # Upload to ImageKit
+        
         logger.info(f"Uploading file {file.filename} ({file_size / (1024*1024):.2f}MB) for user {user.id}")
         
-        # FIX: ImageKit SDK is synchronous and blocks event loop - run in thread pool
-        # This prevents blocking all other requests while file uploads to ImageKit
+        
         def upload_to_imagekit(file_path: str, filename: str, content_type: str):
             """Synchronous ImageKit upload function to run in thread pool"""
             with open(file_path, "rb") as temp_file:
@@ -403,7 +383,7 @@ async def upload_file(
                 )
         
         try:
-            # FIX: Run blocking ImageKit upload in thread pool to avoid blocking event loop
+            
             upload_result = await run_in_threadpool(
                 upload_to_imagekit,
                 temp_file_path,
@@ -417,7 +397,7 @@ async def upload_file(
                 detail="File upload to storage service failed. Please try again later.",
             )
         
-        # Validate upload result - check for url attribute which indicates success
+        
         if not hasattr(upload_result, "url") or not upload_result.url:
             logger.error(f"ImageKit upload failed: {upload_result}")
             raise HTTPException(
@@ -425,7 +405,7 @@ async def upload_file(
                 detail="File upload to storage service failed",
             )
         
-        # Create post record
+        
         file_name = (
             getattr(upload_result, "name", None)
             or getattr(upload_result, "file_name", None)
@@ -441,11 +421,7 @@ async def upload_file(
             file_name=file_name,
         )
         
-        # FIX: Add post to session and commit within try-except to handle DB errors
-        # If commit fails after ImageKit upload, the file remains in ImageKit but isn't referenced in DB
-        # Deleting from ImageKit would require storing file_id, adding complexity and potential for
-        # additional failures. Orphaned files in ImageKit are acceptable - they can be cleaned up
-        # periodically via ImageKit's admin interface or a separate cleanup job if needed.
+        
         session.add(post)
         try:
             await session.commit()
@@ -457,7 +433,7 @@ async def upload_file(
                 exc_info=True
             )
             await session.rollback()
-            # Log the ImageKit URL for potential manual cleanup if needed
+           
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="File uploaded but failed to save post. Please try again.",
@@ -465,7 +441,7 @@ async def upload_file(
         
         logger.info(f"Post created successfully: {post.id} for user {user.id}")
         
-        # FIX: Return response with initial counts (0 for new post)
+
         return UploadResponse(
             id=post.id,
             user_id=post.user_id,
@@ -478,8 +454,7 @@ async def upload_file(
         )
     
     except HTTPException:
-        # FIX: Re-raise HTTPException without rollback (no DB operations before this point)
-        # HTTPExceptions are raised for validation errors before any DB operations
+        
         raise
     except Exception as e:
         logger.error(f"Error uploading file: {e}", exc_info=True)
@@ -489,15 +464,14 @@ async def upload_file(
             detail="An error occurred while processing the file upload",
         )
     finally:
-        # FIX: Ensure proper cleanup of file handles and temp files
-        # Close file handle if still open (error occurred during streaming)
+        
         if temp_file_handle and not temp_file_handle.closed:
             try:
                 temp_file_handle.close()
             except Exception as e:
                 logger.warning(f"Failed to close temp file handle: {e}")
         
-        # Cleanup temporary file in all cases (success or failure)
+        
         if temp_file_path and os.path.exists(temp_file_path):
             try:
                 os.unlink(temp_file_path)
@@ -539,21 +513,19 @@ async def get_feed(
     try:
         offset = (page - 1) * page_size
         
-        # FIX: Get list of followed user IDs for personalized feed ordering
-        # UUIDString type decorator automatically converts UUID objects to strings for SQL
+        
         followed_result = await session.execute(
             select(Follow.followed_id).where(Follow.follower_id == user.id)
         )
         followed_user_ids_list = [row[0] for row in followed_result.all()]
         
-        # FIX: Order by: followed users first (priority=0), then others (priority=1), then by created_at
-        # UUIDString's process_bind_param converts UUID objects to strings for SQL IN clause automatically
+        
         if followed_user_ids_list:
             priority_case = case(
                 (Post.user_id.in_(followed_user_ids_list), 0),
                 else_=1
             )
-            # Get posts with personalized ordering (followed users first)
+            
             posts_query = (
                 select(Post)
                 .order_by(priority_case, desc(Post.created_at))
@@ -561,7 +533,7 @@ async def get_feed(
                 .limit(page_size)
             )
         else:
-            # No follows yet, just order by date (most recent first)
+            
             posts_query = (
                 select(Post)
                 .order_by(desc(Post.created_at))
@@ -573,35 +545,32 @@ async def get_feed(
         posts = result.scalars().all()
         post_ids = [post.id for post in posts]
         
-        # FIX: Get counts and likes in efficient queries
-        # UUIDString type decorator converts DB strings to UUID objects automatically
-        # Get likes counts for these posts
+        
         likes_counts_result = await session.execute(
             select(Like.post_id, func.count(Like.id).label("count"))
             .where(Like.post_id.in_(post_ids))
             .group_by(Like.post_id)
         )
-        # Convert UUID objects to strings for dictionary lookup
+        
         likes_counts = {str(row[0]): row[1] for row in likes_counts_result.all()}
         
-        # Get comments counts for these posts
+        
         comments_counts_result = await session.execute(
             select(Comment.post_id, func.count(Comment.id).label("count"))
             .where(Comment.post_id.in_(post_ids))
             .group_by(Comment.post_id)
         )
-        # Convert UUID objects to strings for dictionary lookup
+       
         comments_counts = {str(row[0]): row[1] for row in comments_counts_result.all()}
         
-        # Get user's likes for these posts (to determine is_liked)
-        # UUIDString type decorator handles UUID conversion automatically
+        
         user_likes_result = await session.execute(
             select(Like.post_id)
             .where(and_(Like.post_id.in_(post_ids), Like.user_id == user.id))
         )
         user_liked_post_ids = {row[0] for row in user_likes_result.all()}
         
-        # Get user information for posts
+        
         user_ids = {post.user_id for post in posts}
         if user_ids:
             users_result = await session.execute(
@@ -611,11 +580,11 @@ async def get_feed(
         else:
             users = {}
         
-        # Get total count for pagination (all posts, not just this page)
+        
         total_result = await session.execute(select(func.count(Post.id)))
         total = total_result.scalar() or 0
         
-        # Build response with counts
+        
         posts_data = []
         for post in posts:
             posts_data.append(
@@ -627,8 +596,7 @@ async def get_feed(
                     file_type=post.file_type,
                     file_name=post.file_name,
                     created_at=post.created_at,
-                    # UUIDString returns UUID objects, fastapi-users User.id is also UUID
-                    # Both should be UUID objects, so direct comparison works
+                    
                     is_owner=post.user_id == user.id,
                     author_email=users.get(post.user_id),
                     likes_count=likes_counts.get(str(post.id), 0),
@@ -691,11 +659,11 @@ async def get_post(
                 detail=f"Post with ID {post_id} not found",
             )
         
-        # Get author information
+        
         user_result = await session.execute(select(User).where(User.id == post.user_id))
         author = user_result.scalars().first()
         
-        # FIX: Get counts and like status for single post
+        
         likes_count_result = await session.execute(
             select(func.count(Like.id)).where(Like.post_id == post_id)
         )
@@ -784,9 +752,7 @@ async def delete_post(
                 detail="You don't have permission to delete this post",
             )
         
-        # FIX: Use delete() statement for async SQLAlchemy operations
-        # While session.delete() still works, delete() statement is the recommended async pattern
-        # and provides better control and compatibility with SQLAlchemy 2.0+ async APIs
+       
         await session.execute(delete(Post).where(Post.id == post_id))
         await session.commit()
         
@@ -809,7 +775,7 @@ async def delete_post(
         )
 
 
-# FIX: Add endpoints for social features (likes, comments, follows)
+
 @app.post(
     "/api/posts/{post_id}/like",
     response_model=LikeResponse,
@@ -835,7 +801,7 @@ async def toggle_like(
         LikeResponse: Success status and current like state
     """
     try:
-        # Verify post exists
+        
         post_result = await session.execute(select(Post).where(Post.id == post_id))
         post = post_result.scalars().first()
         if not post:
@@ -844,14 +810,14 @@ async def toggle_like(
                 detail=f"Post with ID {post_id} not found",
             )
         
-        # Check if user already liked this post
+        
         existing_like_result = await session.execute(
             select(Like).where(and_(Like.post_id == post_id, Like.user_id == user.id))
         )
         existing_like = existing_like_result.scalars().first()
         
         if existing_like:
-            # Unlike: delete the like
+            
             await session.execute(
                 delete(Like).where(and_(Like.post_id == post_id, Like.user_id == user.id))
             )
@@ -864,7 +830,7 @@ async def toggle_like(
                 is_liked=False,
             )
         else:
-            # Like: create new like (unique constraint prevents duplicates)
+            
             new_like = Like(user_id=user.id, post_id=post_id)
             session.add(new_like)
             try:
@@ -878,7 +844,7 @@ async def toggle_like(
                 )
             except SQLAlchemyError as e:
                 await session.rollback()
-                # If unique constraint violation, post was already liked (race condition)
+                
                 logger.warning(f"Duplicate like attempt by user {user.id} on post {post_id}: {e}")
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -923,7 +889,7 @@ async def create_comment(
         CommentResponse: Created comment information
     """
     try:
-        # Verify post exists
+        
         post_result = await session.execute(select(Post).where(Post.id == post_id))
         post = post_result.scalars().first()
         if not post:
@@ -932,7 +898,7 @@ async def create_comment(
                 detail=f"Post with ID {post_id} not found",
             )
         
-        # Create comment
+        
         comment = Comment(
             user_id=user.id,
             post_id=post_id,
@@ -942,7 +908,7 @@ async def create_comment(
         await session.commit()
         await session.refresh(comment)
         
-        # Get author email
+        
         author_result = await session.execute(select(User).where(User.id == user.id))
         author = author_result.scalars().first()
         
@@ -1000,7 +966,7 @@ async def get_comments(
         CommentListResponse: Paginated list of comments
     """
     try:
-        # Verify post exists
+        
         post_result = await session.execute(select(Post).where(Post.id == post_id))
         post = post_result.scalars().first()
         if not post:
@@ -1011,13 +977,13 @@ async def get_comments(
         
         offset = (page - 1) * page_size
         
-        # Get total count
+        
         total_result = await session.execute(
             select(func.count(Comment.id)).where(Comment.post_id == post_id)
         )
         total = total_result.scalar() or 0
         
-        # Get comments with pagination (newest first)
+        
         comments_result = await session.execute(
             select(Comment)
             .where(Comment.post_id == post_id)
@@ -1027,7 +993,7 @@ async def get_comments(
         )
         comments = comments_result.scalars().all()
         
-        # Get author information
+        
         user_ids = {comment.user_id for comment in comments}
         authors = {}
         if user_ids:
@@ -1036,7 +1002,7 @@ async def get_comments(
             )
             authors = {u.id: u.email for u in authors_result.scalars().all()}
         
-        # Build response
+        
         comments_data = []
         for comment in comments:
             comments_data.append(
@@ -1095,14 +1061,14 @@ async def toggle_follow(
         FollowResponse: Success status and current follow state
     """
     try:
-        # Prevent self-follow
+        
         if user_id == user.id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot follow yourself",
             )
         
-        # Verify target user exists
+        
         target_user_result = await session.execute(select(User).where(User.id == user_id))
         target_user = target_user_result.scalars().first()
         if not target_user:
@@ -1111,7 +1077,7 @@ async def toggle_follow(
                 detail=f"User with ID {user_id} not found",
             )
         
-        # Check if already following
+        
         existing_follow_result = await session.execute(
             select(Follow).where(
                 and_(Follow.follower_id == user.id, Follow.followed_id == user_id)
@@ -1120,7 +1086,7 @@ async def toggle_follow(
         existing_follow = existing_follow_result.scalars().first()
         
         if existing_follow:
-            # Unfollow: delete the follow relationship
+            
             await session.execute(
                 delete(Follow).where(
                     and_(Follow.follower_id == user.id, Follow.followed_id == user_id)
@@ -1135,7 +1101,7 @@ async def toggle_follow(
                 is_following=False,
             )
         else:
-            # Follow: create new follow relationship (unique constraint prevents duplicates)
+            
             new_follow = Follow(follower_id=user.id, followed_id=user_id)
             session.add(new_follow)
             try:
@@ -1149,7 +1115,7 @@ async def toggle_follow(
                 )
             except SQLAlchemyError as e:
                 await session.rollback()
-                # If unique constraint violation, already following (race condition)
+               
                 logger.warning(f"Duplicate follow attempt by user {user.id} on user {user_id}: {e}")
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -1192,7 +1158,7 @@ async def get_user_profile(
         UserProfileResponse: User profile with counts
     """
     try:
-        # Get target user
+        
         user_result = await session.execute(select(User).where(User.id == user_id))
         target_user = user_result.scalars().first()
         if not target_user:
@@ -1201,7 +1167,7 @@ async def get_user_profile(
                 detail=f"User with ID {user_id} not found",
             )
         
-        # FIX: Get counts efficiently with separate queries
+        
         followers_count_result = await session.execute(
             select(func.count(Follow.id)).where(Follow.followed_id == user_id)
         )
@@ -1217,7 +1183,7 @@ async def get_user_profile(
         )
         posts_count = posts_count_result.scalar() or 0
         
-        # Check if current user follows target user
+        
         is_following_result = await session.execute(
             select(Follow.id).where(
                 and_(Follow.follower_id == user.id, Follow.followed_id == user_id)
@@ -1246,7 +1212,7 @@ async def get_user_profile(
         )
 
 
-# Root endpoint
+
 @app.get("/", tags=["Root"], summary="API Root", description="Get API information")
 async def root():
     """Root endpoint providing API information"""

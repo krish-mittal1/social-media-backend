@@ -22,10 +22,10 @@ class PostResponse(BaseModel):
     created_at: datetime
     is_owner: bool = False
     author_email: Optional[str] = None
-    # FIX: Add counts for social features (computed, not from DB model)
+    
     likes_count: int = 0
     comments_count: int = 0
-    is_liked: bool = False  # Whether current user has liked this post
+    is_liked: bool = False  
 
 
 class PostListResponse(BaseModel):
@@ -86,7 +86,6 @@ class UserUpdate(schemas.BaseUserUpdate):
     pass
 
 
-# FIX: Add schemas for new social features (likes, comments, follows)
 class CommentCreate(BaseModel):
     """Schema for creating a comment"""
     content: str = Field(..., min_length=1, max_length=2000, description="Comment content")
@@ -120,7 +119,7 @@ class LikeResponse(BaseModel):
     success: bool
     message: str
     post_id: uuid.UUID
-    is_liked: bool  # True if liked, False if unliked
+    is_liked: bool  
 
 
 class FollowResponse(BaseModel):
@@ -128,7 +127,7 @@ class FollowResponse(BaseModel):
     success: bool
     message: str
     followed_user_id: uuid.UUID
-    is_following: bool  # True if following, False if unfollowed
+    is_following: bool  
 
 
 class UserProfileResponse(BaseModel):
@@ -139,9 +138,8 @@ class UserProfileResponse(BaseModel):
     email: str
     is_active: bool
     is_verified: bool
-    # FIX: Add counts for user profile
     followers_count: int = 0
     following_count: int = 0
     posts_count: int = 0
-    is_following: bool = False  # Whether current user follows this user
+    is_following: bool = False  
 
