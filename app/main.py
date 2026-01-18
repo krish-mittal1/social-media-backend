@@ -115,23 +115,9 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
-# FIX: Explicitly define allowed origins to ensure localhost works even if env var is set
-origins = [
-    "http://localhost:3000",
-    "http://localhost:8000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://social-media-backend-a8h9.onrender.com",
-]
-
-# Add any additional origins from environment variable
-env_origins = os.getenv("CORS_ORIGINS")
-if env_origins:
-    origins.extend([origin.strip() for origin in env_origins.split(",") if origin.strip()])
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
